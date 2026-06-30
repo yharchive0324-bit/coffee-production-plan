@@ -1,0 +1,22 @@
+/* ============================================================
+   인쇄 전용 스타일 — 작업지시서 / 생산계획 출력
+   화면 UI(사이드바, 상단바, 버튼)는 숨기고 문서만 출력
+   ============================================================ */
+@page { size: A4 portrait; margin: 14mm; }
+
+.topbar, .sidebar, .breadcrumb,
+.page-head__actions, .btn, .nav, .no-print { display: none !important; }
+
+body { background: #fff; font-size: 12px; }
+.layout { display: block; }
+.content { padding: 0; }
+.card { box-shadow: none; border: 1px solid #999; page-break-inside: avoid; }
+.card__head { background: #f0f0f0; }
+
+.print-only { display: block !important; }
+
+/* 인쇄 시 작업지시서 1건당 한 페이지 */
+.print-page { page-break-after: always; }
+.print-page:last-child { page-break-after: auto; }
+
+.tbl th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

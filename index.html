@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>커피 생산관리 시스템 (Wireframe)</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="assets/css/print.css" media="print" />
+</head>
+<body>
+  <!-- 상단 바 -->
+  <header class="topbar">
+    <button class="topbar__toggle" id="navToggle" title="메뉴 접기/펼치기">☰</button>
+    <div class="topbar__brand">
+      <span class="topbar__logo">☕</span>
+      <span class="topbar__title">커피 생산관리 시스템</span>
+      <span class="badge badge--wire">WIREFRAME</span>
+    </div>
+    <div class="topbar__spacer"></div>
+    <div class="topbar__user">
+      <span class="topbar__plant">제1공장</span>
+      <span class="topbar__avatar">관리자</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- 좌측 메뉴 -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="nav" id="nav"><!-- JS로 렌더링 --></nav>
+      <div class="sidebar__foot">
+        <p>로컬 와이어프레임</p>
+        <p>DB 미연결 · 샘플데이터</p>
+      </div>
+    </aside>
+
+    <!-- 본문 -->
+    <main class="content">
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div id="view"><!-- 페이지 렌더링 영역 --></div>
+    </main>
+  </div>
+
+  <!-- 스크립트 (빌드 도구 없이 file:// 로 바로 실행 가능하도록 일반 script 사용) -->
+  <script src="assets/js/util.js"></script>
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/calc.js"></script>
+  <script src="assets/js/pages.js"></script>
+  <script src="assets/js/router.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

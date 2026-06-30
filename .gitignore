@@ -1,0 +1,15 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Node (추후 도입 대비)
+node_modules/
+npm-debug.log*
+
+# Logs / temp
+*.log
+.tmp/
