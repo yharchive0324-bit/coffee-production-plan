@@ -13,3 +13,6 @@ npm-debug.log*
 # Logs / temp
 *.log
 .tmp/
+
+# Claude Code local settings
+.claude/
