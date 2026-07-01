@@ -146,6 +146,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl td.num, .tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tbl td.center, .tbl th.center { text-align: center; }
 .tbl tfoot td { font-weight: 700; background: #faf9f7; border-top: 2px solid var(--c-border); }
+/* 생산라인 그룹 헤더 / 소계 행 */
+.tbl tr.grp td { background: #f3eee7; font-weight: 700; color: var(--c-primary-d); }
+.tbl tr.grp:hover td { background: #f3eee7; }
+.tbl tr.subtot td { background: #faf7f2; font-weight: 600; color: #5a4a3a; }
+.tbl tr.subtot:hover td { background: #faf7f2; }
 
 /* ---------- 폼 ---------- */
 .form-row { display: flex; flex-wrap: wrap; gap: 16px; }

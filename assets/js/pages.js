@@ -356,12 +356,13 @@
       '</div><div class="kpi__value" style="font-size:18px">' + v + "</div></div>";
   }
 
-  /* ====================== 주간 생산계획 ====================== */
+  /* ====================== 주간 생산계획 (생산라인별 세분화) ====================== */
   const planWeekly = {
     title: "주간 생산계획", crumb: ["생산계획", "주간 생산계획"],
     render() {
       const wp = DB.getWeekPlan();
       const days = wp.days;
+      const nCols = days.length + 2; // 제품 + 요일들 + 합계
 
       // 헤더: 요일(날짜) — 클릭 시 일간계획 이동
       const dayTh = days.map((d) =>
@@ -370,33 +371,50 @@
         e(d.date.slice(5)) + "</span></th>"
       ).join("");
 
-      // 본문: 제품 × 요일
-      const bodyRows = wp.rows.map((r) => {
-        const p = DB.getProduct(r.product) || {};
-        const cells = r.qty.map((q, i) =>
-          '<td class="num day-col" data-date="' + e(days[i].date) + '" style="cursor:pointer">' +
-          (q > 0 ? n0(q) : '<span style="color:#ccc">-</span>') + "</td>"
-        ).join("");
-        const rowTotal = r.qty.reduce((a, b) => a + b, 0);
-        return "<tr><td>" + e(p.name || r.product) + '</td>' + cells +
-          '<td class="num" style="font-weight:700">' + n0(rowTotal) + "</td></tr>";
-      }).join("");
+      const cell = (q, date) =>
+        '<td class="num day-col" data-date="' + e(date) + '" style="cursor:pointer">' +
+        (q > 0 ? n0(q) : '<span style="color:#ccc">-</span>') + "</td>";
 
-      // 합계 행
-      const dayTotals = days.map((d, i) => {
-        const t = wp.rows.reduce((a, r) => a + (r.qty[i] || 0), 0);
-        return '<td class="num">' + (t > 0 ? n0(t) : '<span style="color:#ccc">-</span>') + "</td>";
-      }).join("");
-      const grand = wp.rows.reduce((a, r) => a + r.qty.reduce((x, y) => x + y, 0), 0);
+      // 생산라인별 그룹 → 제품행 → 라인 소계
+      const dayGrand = days.map(() => 0);
+      let grand = 0;
+      let body = "";
 
-      return head("주간 생산계획", wp.weekLabel + " · 완제품 생산수량(ea) 기준") +
-        '<div class="note no-print">요일(날짜) 헤더나 수량 셀을 클릭하면 해당일 <b>일간 생산계획</b>으로 이동합니다.</div>' +
+      DB.lines.forEach((line) => {
+        const rows = wp.rows.filter((r) => (DB.getProduct(r.product) || {}).line === line);
+        if (!rows.length) return;
+
+        body += '<tr class="grp"><td colspan="' + nCols + '">🏭 ' + e(line) + " 라인</td></tr>";
+
+        const daySub = days.map(() => 0);
+        let sub = 0;
+        rows.forEach((r) => {
+          const p = DB.getProduct(r.product) || {};
+          const cells = r.qty.map((q, i) => {
+            daySub[i] += q; dayGrand[i] += q;
+            return cell(q, days[i].date);
+          }).join("");
+          const rowTotal = r.qty.reduce((a, b) => a + b, 0);
+          sub += rowTotal; grand += rowTotal;
+          body += '<tr><td style="padding-left:26px">' + e(p.name || r.product) +
+            "</td>" + cells + '<td class="num" style="font-weight:700">' + n0(rowTotal) + "</td></tr>";
+        });
+
+        body += '<tr class="subtot"><td>└ ' + e(line) + " 소계</td>" +
+          daySub.map((t) => '<td class="num">' + n0(t) + "</td>").join("") +
+          '<td class="num">' + n0(sub) + "</td></tr>";
+      });
+
+      const grandCells = dayGrand.map((t) => '<td class="num">' + n0(t) + "</td>").join("");
+
+      return head("주간 생산계획", wp.weekLabel + " · 생산라인별 완제품 생산수량(ea)") +
+        '<div class="note no-print">라인별로 세분화된 주간계획입니다. 요일(날짜) 헤더나 수량 셀을 클릭하면 해당일 <b>일간 생산계획</b>으로 이동합니다.</div>' +
         '<div class="card"><div class="card__head">' + e(wp.weekLabel) +
-        ' <span class="badge badge--info">월~일</span></div>' +
+        ' <span class="badge badge--info">' + DB.lines.length + "개 라인 · 월~일</span></div>" +
         '<div class="card__body card__body--pad0"><div class="table-wrap"><table class="tbl">' +
-        "<thead><tr><th>제품</th>" + dayTh + "<th class='num'>주간 합계</th></tr></thead>" +
-        "<tbody>" + bodyRows + "</tbody>" +
-        '<tfoot><tr><td>일 합계</td>' + dayTotals +
+        "<thead><tr><th>생산라인 / 제품</th>" + dayTh + "<th class='num'>주간 합계</th></tr></thead>" +
+        "<tbody>" + body + "</tbody>" +
+        '<tfoot><tr><td>전체 합계</td>' + grandCells +
         '<td class="num">' + n0(grand) + "</td></tr></tfoot>" +
         "</table></div></div></div>";
     },
