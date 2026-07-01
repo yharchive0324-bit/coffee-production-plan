@@ -16,6 +16,12 @@
 python -m http.server   # 그 후 http://localhost:8000 접속
 ```
 
+## 배포 (Vercel)
+
+빌드 과정이 없는 정적 사이트이므로 Vercel에 **무설정**으로 배포됩니다. GitHub 저장소를
+Vercel에 연결하면 `main` 브랜치에 푸시할 때마다 자동 배포됩니다. Framework Preset은
+`Other`, Build Command·Output Directory는 비워두면 됩니다(루트의 `index.html`을 그대로 서빙).
+
 ## 주요 흐름
 
 ```
