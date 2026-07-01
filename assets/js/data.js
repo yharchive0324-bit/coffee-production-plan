@@ -35,6 +35,8 @@
       group: "생산계획",
       items: [
         { route: "plan",        icon: "📈", label: "생산계획 산출" },
+        { route: "planWeekly",  icon: "🗓️", label: "주간 생산계획" },
+        { route: "planDaily",   icon: "📅", label: "일간 생산계획" },
         { route: "planProcess", icon: "🗂️", label: "공정별 생산계획" },
       ],
     },
@@ -130,12 +132,43 @@
     { no: "SO-2026-0150", date: "2026-06-30", due: "2026-07-08", customer: "C카페",  product: "FG-3001", qty: 20000, status: "계획대기" },
   ];
 
+  /* ---------- 주간 생산계획 (가상 샘플) ----------
+     한 주(월~일)를 기준으로 제품별 일일 생산수량(완제품 ea)을 배분.
+     행 합계는 위 발주량(orders)과 일치하도록 구성.
+     ※ 실제로는 발주·능력계획으로 산출되지만, 지금은 정적 샘플. */
+  const weekPlan = {
+    weekLabel: "2026년 27주차",
+    days: [
+      { date: "2026-06-29", dow: "월" },
+      { date: "2026-06-30", dow: "화" },
+      { date: "2026-07-01", dow: "수" },
+      { date: "2026-07-02", dow: "목" },
+      { date: "2026-07-03", dow: "금" },
+      { date: "2026-07-04", dow: "토" },
+      { date: "2026-07-05", dow: "일" },
+    ],
+    rows: [
+      { product: "FG-1001", qty: [3000, 3000, 2000, 2000, 2000, 0, 0] },
+      { product: "FG-2001", qty: [2000, 2000, 2000, 1000, 1000, 0, 0] },
+      { product: "FG-3001", qty: [4000, 4000, 4000, 4000, 4000, 0, 0] },
+    ],
+  };
+
   /* ---------- 조회 헬퍼 ---------- */
   const DB = {
-    processes, products, orders,
+    processes, products, orders, weekPlan,
     getProcess: (code) => processes.find((p) => p.code === code),
     getProcessName: (code) => (processes.find((p) => p.code === code) || {}).name || code,
     getProduct: (code) => products.find((p) => p.code === code),
+    getWeekPlan: () => weekPlan,
+    // 특정 날짜의 제품별 생산량 목록 [{ product, qty }]
+    getDailyPlan: (date) => {
+      const idx = weekPlan.days.findIndex((d) => d.date === date);
+      if (idx < 0) return [];
+      return weekPlan.rows
+        .map((r) => ({ product: r.product, qty: r.qty[idx] || 0 }))
+        .filter((r) => r.qty > 0);
+    },
   };
 
   window.DB = DB;

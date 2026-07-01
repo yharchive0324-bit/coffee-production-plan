@@ -10,7 +10,8 @@
   const e = U.esc, n0 = U.n0, nd = U.nd, pct = U.pct;
 
   // 페이지 간 공유 상태 (발주→계획→작업지시 연계)
-  window.STATE = window.STATE || { planInput: { productCode: "FG-1001", qty: 12000, orderNo: "" } };
+  window.STATE = window.STATE || { planInput: { productCode: "FG-1001", qty: 12000, orderNo: "" }, planDate: "" };
+  if (!STATE.planDate) STATE.planDate = "";
 
   function head(title, sub, actions) {
     return (
@@ -355,6 +356,173 @@
       '</div><div class="kpi__value" style="font-size:18px">' + v + "</div></div>";
   }
 
+  /* ====================== 주간 생산계획 ====================== */
+  const planWeekly = {
+    title: "주간 생산계획", crumb: ["생산계획", "주간 생산계획"],
+    render() {
+      const wp = DB.getWeekPlan();
+      const days = wp.days;
+
+      // 헤더: 요일(날짜) — 클릭 시 일간계획 이동
+      const dayTh = days.map((d) =>
+        '<th class="num center day-col" data-date="' + e(d.date) + '" style="cursor:pointer" ' +
+        'title="' + e(d.date) + ' 일간계획 보기">' + e(d.dow) + "<br><span style='font-weight:400;color:#888'>" +
+        e(d.date.slice(5)) + "</span></th>"
+      ).join("");
+
+      // 본문: 제품 × 요일
+      const bodyRows = wp.rows.map((r) => {
+        const p = DB.getProduct(r.product) || {};
+        const cells = r.qty.map((q, i) =>
+          '<td class="num day-col" data-date="' + e(days[i].date) + '" style="cursor:pointer">' +
+          (q > 0 ? n0(q) : '<span style="color:#ccc">-</span>') + "</td>"
+        ).join("");
+        const rowTotal = r.qty.reduce((a, b) => a + b, 0);
+        return "<tr><td>" + e(p.name || r.product) + '</td>' + cells +
+          '<td class="num" style="font-weight:700">' + n0(rowTotal) + "</td></tr>";
+      }).join("");
+
+      // 합계 행
+      const dayTotals = days.map((d, i) => {
+        const t = wp.rows.reduce((a, r) => a + (r.qty[i] || 0), 0);
+        return '<td class="num">' + (t > 0 ? n0(t) : '<span style="color:#ccc">-</span>') + "</td>";
+      }).join("");
+      const grand = wp.rows.reduce((a, r) => a + r.qty.reduce((x, y) => x + y, 0), 0);
+
+      return head("주간 생산계획", wp.weekLabel + " · 완제품 생산수량(ea) 기준") +
+        '<div class="note no-print">요일(날짜) 헤더나 수량 셀을 클릭하면 해당일 <b>일간 생산계획</b>으로 이동합니다.</div>' +
+        '<div class="card"><div class="card__head">' + e(wp.weekLabel) +
+        ' <span class="badge badge--info">월~일</span></div>' +
+        '<div class="card__body card__body--pad0"><div class="table-wrap"><table class="tbl">' +
+        "<thead><tr><th>제품</th>" + dayTh + "<th class='num'>주간 합계</th></tr></thead>" +
+        "<tbody>" + bodyRows + "</tbody>" +
+        '<tfoot><tr><td>일 합계</td>' + dayTotals +
+        '<td class="num">' + n0(grand) + "</td></tr></tfoot>" +
+        "</table></div></div></div>";
+    },
+    mount() {
+      document.querySelectorAll(".day-col").forEach((el) =>
+        el.addEventListener("click", () => {
+          STATE.planDate = el.dataset.date;
+          go("planDaily?date=" + el.dataset.date);
+        })
+      );
+    },
+  };
+
+  /* ====================== 일간 생산계획 ====================== */
+  // 특정일 제품별 계획 + 공정별 부하 집계
+  function aggregateDay(date) {
+    const list = DB.getDailyPlan(date); // [{product, qty}]
+    const products = list.map((x) => ({
+      code: x.product, qty: x.qty, plan: CALC.buildPlan(x.product, x.qty),
+    }));
+    const procMap = {};
+    products.forEach((p) => {
+      p.plan.steps.forEach((s) => {
+        if (!procMap[s.process]) {
+          procMap[s.process] = {
+            process: s.process, name: s.processName, wc: s.workCenter,
+            input: 0, output: 0, minutes: 0,
+          };
+        }
+        procMap[s.process].input += s.inputQty;
+        procMap[s.process].output += s.outputQty;
+        procMap[s.process].minutes += s.stdMinutes;
+      });
+    });
+    const order = DB.processes.map((p) => p.code);
+    const procs = Object.keys(procMap).map((k) => procMap[k])
+      .sort((a, b) => order.indexOf(a.process) - order.indexOf(b.process));
+    return { products, procs };
+  }
+
+  const planDaily = {
+    title: "일간 생산계획", crumb: ["생산계획", "일간 생산계획"],
+    render(params) {
+      const wp = DB.getWeekPlan();
+      const date = (params && params.date) || STATE.planDate ||
+        (wp.days.find((d) => DB.getDailyPlan(d.date).length > 0) || wp.days[0]).date;
+      STATE.planDate = date;
+
+      // 날짜 선택 탭
+      const tabs = wp.days.map((d) => {
+        const has = DB.getDailyPlan(d.date).length > 0;
+        const active = d.date === date;
+        return '<button class="btn btn--sm day-tab' + (active ? " btn--primary" : "") + '"' +
+          (has ? "" : " disabled") + ' data-date="' + e(d.date) + '" title="' + e(d.date) + '">' +
+          e(d.dow) + " " + e(d.date.slice(5)) + "</button>";
+      }).join(" ");
+      const tabBar = '<div class="card"><div class="card__body"><div class="page-head__actions">' +
+        tabs + "</div></div></div>";
+
+      const agg = aggregateDay(date);
+      if (!agg.products.length) {
+        return head("일간 생산계획", date + " (생산 없음)") + tabBar +
+          '<div class="empty">해당일에 계획된 생산이 없습니다. (주말/휴무)</div>';
+      }
+
+      // 제품별 당일 생산량
+      const prodRows = agg.products.map((p) => {
+        const r = p.plan;
+        return "<tr><td>" + e(r.product.name) + '</td><td class="num">' + n0(p.qty) +
+          '</td><td class="num">' + n0(r.grossInputQty) + '</td><td class="num">' + pct(r.totalYield) +
+          '</td><td class="num">' + nd(r.totalStdMinutes / 60, 1) +
+          '</td><td class="center"><button class="btn btn--sm to-plan" data-product="' + e(p.code) +
+          '" data-qty="' + p.qty + '">계획산출 →</button></td></tr>';
+      }).join("");
+      const dayQtyTotal = agg.products.reduce((a, p) => a + p.qty, 0);
+
+      const prodTable =
+        '<div class="card"><div class="card__head">제품별 당일 생산량</div>' +
+        '<div class="card__body card__body--pad0"><div class="table-wrap"><table class="tbl">' +
+        "<thead><tr><th>제품</th><th class='num'>생산량(ea)</th><th class='num'>최초투입(ea)</th>" +
+        "<th class='num'>누적수율</th><th class='num'>표준시간(h)</th><th class='center'>작업</th></tr></thead>" +
+        "<tbody>" + prodRows + "</tbody>" +
+        '<tfoot><tr><td>합계</td><td class="num">' + n0(dayQtyTotal) + '</td><td colspan="4"></td></tr></tfoot>' +
+        "</table></div></div></div>";
+
+      // 공정별 당일 부하
+      const procRows = agg.procs.map((p) =>
+        "<tr><td>" + e(p.name) + '</td><td class="center">' + e(p.wc) + '</td><td class="num">' +
+        n0(p.input) + '</td><td class="num">' + n0(p.output) + '</td><td class="num">' +
+        nd(p.minutes, 0) + '</td><td class="num">' + nd(p.minutes / 60, 1) + "</td></tr>"
+      ).join("");
+      const totMin = agg.procs.reduce((a, p) => a + p.minutes, 0);
+
+      const procTable =
+        '<div class="card"><div class="card__head">공정별 당일 생산부하 (제품 합산)</div>' +
+        '<div class="card__body card__body--pad0"><div class="table-wrap"><table class="tbl">' +
+        "<thead><tr><th>공정</th><th class='center'>작업장</th><th class='num'>총 투입</th>" +
+        "<th class='num'>총 산출</th><th class='num'>표준시간(분)</th><th class='num'>표준시간(h)</th></tr></thead>" +
+        "<tbody>" + procRows + "</tbody>" +
+        '<tfoot><tr><td colspan="4">합계</td><td class="num">' + nd(totMin, 0) +
+        '</td><td class="num">' + nd(totMin / 60, 1) + "</td></tr></tfoot>" +
+        "</table></div></div></div>";
+
+      return head("일간 생산계획", date + " · 주간계획에서 전개된 당일 계획",
+        '<button class="btn" id="dayToWeekly">← 주간 생산계획</button>') +
+        tabBar + prodTable + procTable;
+    },
+    mount() {
+      document.querySelectorAll(".day-tab").forEach((b) =>
+        b.addEventListener("click", () => {
+          if (b.disabled) return;
+          STATE.planDate = b.dataset.date;
+          go("planDaily?date=" + b.dataset.date);
+        })
+      );
+      document.querySelectorAll(".to-plan").forEach((b) =>
+        b.addEventListener("click", () => {
+          STATE.planInput = { productCode: b.dataset.product, qty: parseInt(b.dataset.qty, 10) || 0, orderNo: "" };
+          go("plan");
+        })
+      );
+      const w = document.getElementById("dayToWeekly");
+      w && w.addEventListener("click", () => go("planWeekly"));
+    },
+  };
+
   /* ====================== 공정별 작업지시 (+ 인쇄) ====================== */
   const workorder = {
     title: "공정별 작업지시", crumb: ["작업지시", "공정별 작업지시"],
@@ -425,6 +593,6 @@
   /* ============================ export ============================ */
   window.PAGES = {
     dashboard, products, bom, routing, process,
-    order, orderList, plan, planProcess, workorder,
+    order, orderList, plan, planWeekly, planDaily, planProcess, workorder,
   };
 })();
